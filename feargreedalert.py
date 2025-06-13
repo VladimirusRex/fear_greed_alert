@@ -1,55 +1,29 @@
-import requests
-import datetime
+name: Fear and Greed Alert
 
-BOT_TOKEN = "8087581054:AAGhSYcbiOraPHjANJSCg9Bq53aYS62S77U"
-CHAT_ID = "1155086635"
-LOG_FILE = "/home/user/Desktop/scripts/alert.log"  # <- Chemin vers le log
+on:
+  schedule:
+    - cron: '0 * * * *' # Exécute toutes les heures (au début de l'heure)
 
-def log_message(content):
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with open(LOG_FILE, "a") as f:
-        f.write(f"[{timestamp}] {content}\n")
+jobs:
+  run-alert:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-def send_telegram_message(message):
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": CHAT_ID, "text": message}
-    response = requests.post(url, data=payload)
-    if response.status_code != 200:
-        error_msg = f"❌ Erreur envoi Telegram: {response.text}"
-        print(error_msg)
-        log_message(error_msg)
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x' # Utilise la dernière version 3.x
 
-def get_fear_and_greed():
-    response = requests.get("https://api.alternative.me/fng/?limit=1&format=json")
-    data = response.json()
-    value = int(data["data"][0]["value"])
-    label = data["data"][0]["value_classification"]
-    return value, label
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
 
-def get_btc_price():
-    url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
-    response = requests.get(url)
-    price = response.json()["bitcoin"]["usd"]
-    return price
-
-def main():
-    value, label = get_fear_and_greed()
-    btc_price = get_btc_price()
-    price_str = f"${btc_price:,.0f}"  # Format propre, sans décimales
-
-    if label == "Extreme Fear":
-        message = f"🧊 EXTREME FEAR ({value}) → Utiliser 2% pour acheter du BTC à {price_str} 💰"
-    elif label == "Fear":
-        message = f"🥶 FEAR ({value}) → Utiliser 1% pour acheter du BTC à {price_str} 💰"
-    elif label == "Extreme Greed":
-        message = f"🔥 EXTREME GREED ({value}) → Utiliser 2% pour vendre du BTC à {price_str} 🚨"
-    elif label == "Greed":
-        message = f"😈 GREED ({value}) → Utiliser 1% pour vendre du BTC à {price_str} 🚨"
-    else:
-        message = f"😐 Indice neutre ({value}) → Enjoy your day, rien à faire à part attendre que les marchés s'emballent."
-
-    send_telegram_message(message)
-    log_message(message)
-
-if __name__ == "__main__":
-    main()
+      - name: Run feargreedalert script
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          LOG_FILE: /tmp/alert.log # Chemin temporaire car pas de disque persistant
+        run: python feargreedalert.py
