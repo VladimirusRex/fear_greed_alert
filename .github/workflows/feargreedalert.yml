@@ -2,7 +2,8 @@ name: Fear and Greed Alert
 
   on:
     schedule:
-      - cron: '0 * * * *' # Exécute toutes les heures (au début de l'heure)
+      - cron: '0 7 * * *' # Exécute tous les jours à 07:00 UTC (09:00 CEST)
+      - cron: '0 13 * * *' # Exécute tous les jours à 13:00 UTC (15:00 CEST)
 
   jobs:
     run-alert:
@@ -14,7 +15,7 @@ name: Fear and Greed Alert
         - name: Set up Python
           uses: actions/setup-python@v4
           with:
-            python-version: '3.x' # Utilise la dernière version 3.x
+            python-version: '3.12.7' # Utilise la version Python 3.12.7
 
         - name: Install dependencies
           run: |
@@ -25,5 +26,5 @@ name: Fear and Greed Alert
           env:
             BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
             CHAT_ID: ${{ secrets.CHAT_ID }}
-            LOG_FILE: /tmp/alert.log # Chemin temporaire car pas de disque persistant
+            LOG_FILE: /tmp/feargreedalert.log # Chemin temporaire spécifique
           run: python feargreedalert.py
