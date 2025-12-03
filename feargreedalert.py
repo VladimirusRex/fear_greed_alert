@@ -52,13 +52,51 @@ def get_fear_and_greed():
 
 # ─────────────────────────────
 # 💰 Fonction pour récupérer le prix BTC (en USD)
-# Via l’API CoinGecko
+# Essaie plusieurs APIs avec fallback automatique
 # ─────────────────────────────
 def get_btc_price():
-    url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
-    response = requests.get(url)
-    price = response.json()["bitcoin"]["usd"]
-    return price
+    # API 1: Binance (la plus fiable et rapide)
+    try:
+        response = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT", timeout=5)
+        if response.status_code == 200:
+            price = float(response.json()["price"])
+            log_message(f"✅ Prix BTC obtenu via Binance: ${price:,.2f}")
+            return price
+    except Exception as e:
+        log_message(f"⚠️ Binance échoué: {e}")
+
+    # API 2: Coinbase
+    try:
+        response = requests.get("https://api.coinbase.com/v2/prices/BTC-USD/spot", timeout=5)
+        if response.status_code == 200:
+            price = float(response.json()["data"]["amount"])
+            log_message(f"✅ Prix BTC obtenu via Coinbase: ${price:,.2f}")
+            return price
+    except Exception as e:
+        log_message(f"⚠️ Coinbase échoué: {e}")
+
+    # API 3: CoinGecko (fallback)
+    try:
+        response = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd", timeout=5)
+        if response.status_code == 200:
+            price = float(response.json()["bitcoin"]["usd"])
+            log_message(f"✅ Prix BTC obtenu via CoinGecko: ${price:,.2f}")
+            return price
+    except Exception as e:
+        log_message(f"⚠️ CoinGecko échoué: {e}")
+
+    # API 4: Kraken (dernier recours)
+    try:
+        response = requests.get("https://api.kraken.com/0/public/Ticker?pair=XBTUSD", timeout=5)
+        if response.status_code == 200:
+            price = float(response.json()["result"]["XXBTZUSD"]["c"][0])
+            log_message(f"✅ Prix BTC obtenu via Kraken: ${price:,.2f}")
+            return price
+    except Exception as e:
+        log_message(f"⚠️ Kraken échoué: {e}")
+
+    # Toutes les APIs ont échoué
+    raise Exception("❌ Impossible de récupérer le prix BTC depuis toutes les sources")
 
 # ─────────────────────────────
 # 🚀 Fonction principale du script
@@ -66,34 +104,47 @@ def get_btc_price():
 # Ajoute un horodatage + emoji visuel
 # ─────────────────────────────
 def main():
-    # 🕐 Date et heure actuelle
-    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    try:
+        # 🕐 Date et heure actuelle
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    # 📈 Données du jour
-    value, label = get_fear_and_greed()
-    btc_price = get_btc_price()
-    price_str = f"${btc_price:,.0f}"
+        # 📈 Données du jour
+        log_message("🔄 Récupération de l'indice Fear & Greed...")
+        value, label = get_fear_and_greed()
 
-    # 🧠 Mapping du label → message avec emojis + recommandations
-    if label == "Extreme Fear":
-        sentiment = "🟣 EXTREME FEAR"
-        message = f"{now} • {sentiment} ({value})\n→ Utiliser 2% pour acheter du BTC à {price_str} 💰"
-    elif label == "Fear":
-        sentiment = "🟦 FEAR"
-        message = f"{now} • {sentiment} ({value})\n→ Utiliser 1% pour acheter du BTC à {price_str} 💰"
-    elif label == "Extreme Greed":
-        sentiment = "🔴 EXTREME GREED"
-        message = f"{now} • {sentiment} ({value})\n→ Utiliser 2% pour vendre du BTC à {price_str} 🚨"
-    elif label == "Greed":
-        sentiment = "🟡 GREED"
-        message = f"{now} • {sentiment} ({value})\n→ Utiliser 1% pour vendre du BTC à {price_str} 🚨"
-    else:
-        sentiment = "😐 NEUTRE"
-        message = f"{now} • {sentiment} ({value})\n→ Rien à faire, attendre que les marchés bougent."
+        log_message("🔄 Récupération du prix BTC...")
+        btc_price = get_btc_price()
+        price_str = f"${btc_price:,.0f}"
 
-    # 📤 Envoi et log
-    send_telegram_message(message)
-    log_message(message)
+        # 🧠 Mapping du label → message avec emojis + recommandations
+        if label == "Extreme Fear":
+            sentiment = "🟣 EXTREME FEAR"
+            message = f"{now} • {sentiment} ({value})\n→ Utiliser 2% pour acheter du BTC à {price_str} 💰"
+        elif label == "Fear":
+            sentiment = "🟦 FEAR"
+            message = f"{now} • {sentiment} ({value})\n→ Utiliser 1% pour acheter du BTC à {price_str} 💰"
+        elif label == "Extreme Greed":
+            sentiment = "🔴 EXTREME GREED"
+            message = f"{now} • {sentiment} ({value})\n→ Utiliser 2% pour vendre du BTC à {price_str} 🚨"
+        elif label == "Greed":
+            sentiment = "🟡 GREED"
+            message = f"{now} • {sentiment} ({value})\n→ Utiliser 1% pour vendre du BTC à {price_str} 🚨"
+        else:
+            sentiment = "😐 NEUTRE"
+            message = f"{now} • {sentiment} ({value})\n→ Rien à faire, attendre que les marchés bougent."
+
+        # 📤 Envoi et log
+        send_telegram_message(message)
+        log_message(f"✅ Message envoyé avec succès: {message}")
+
+    except Exception as e:
+        error_message = f"❌ Erreur dans le script: {str(e)}"
+        log_message(error_message)
+        # Envoyer une alerte Telegram en cas d'erreur
+        try:
+            send_telegram_message(f"⚠️ Erreur Fear & Greed Alert\n{error_message}")
+        except:
+            log_message("❌ Impossible d'envoyer l'alerte d'erreur via Telegram")
 
 # ─────────────────────────────
 # ▶️ Lancement du script
